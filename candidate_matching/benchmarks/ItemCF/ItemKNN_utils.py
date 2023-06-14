@@ -1,7 +1,7 @@
-#======================================================================
+# ======================================================================
 # Evaluation metrics modified from DEEM project
 # Edited by XUEPAI team
-#======================================================================
+# ======================================================================
 
 import numpy as np
 import itertools
@@ -22,17 +22,21 @@ def evaluate_metrics(pred_matrix, test_user2items, metrics):
             raise NotImplementedError('metrics={} not implemented.'.format(metric))
 
     topk_items_chunk = np.argpartition(-pred_matrix, range(max_topk))[:, 0:max_topk]
+    # 每个user评分最大的topk个item
     true_items_chunk = [test_user2items[user_index] for user_index in range(num_users)]
+    # 真实的user有过交互的item
     results = [[fn(topk_items, true_items) for fn in metric_callers] \
-                for topk_items, true_items in zip(topk_items_chunk, true_items_chunk)]
+               for topk_items, true_items in zip(topk_items_chunk, true_items_chunk)]
     average_result = np.average(np.array(results), axis=0).tolist()
     return_dict = dict(zip(metrics, average_result))
-    print('%s [Metrics] ' % datetime.now() + ' - '.join('{}: {:.6f}'.format(k, v) for k, v in zip(metrics, average_result)))
+    print('%s [Metrics] ' % datetime.now() + ' - '.join(
+        '{}: {:.6f}'.format(k, v) for k, v in zip(metrics, average_result)))
     return return_dict
 
 
 class Recall(object):
     """Recall metric."""
+
     def __init__(self, k=1):
         self.topk = k
 
@@ -45,6 +49,7 @@ class Recall(object):
 
 class Precision(object):
     """Precision metric."""
+
     def __init__(self, k=1):
         self.topk = k
 
@@ -70,6 +75,7 @@ class F1(object):
 class DCG(object):
     """ Calculate discounted cumulative gain
     """
+
     def __init__(self, k=1):
         self.topk = k
 
@@ -85,6 +91,7 @@ class DCG(object):
 
 class NDCG(object):
     """Normalized discounted cumulative gain metric."""
+
     def __init__(self, k=1):
         self.topk = k
 
@@ -105,25 +112,3 @@ class HitRate(object):
         hit_items = set(true_items) & set(topk_items)
         hit_rate = 1 if len(hit_items) > 0 else 0
         return hit_rate
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

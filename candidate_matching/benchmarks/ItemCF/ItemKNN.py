@@ -1,11 +1,11 @@
-#======================================================================
+# ======================================================================
 # ItemKNN model for implicit CF, modified based on the following papers:
 # + [WWW'2001] Item-Based Collaborative Filtering Recommendation Algorithms
 # + [SIGIR'2007] Effective Missing Data Prediction for Collaborative Filtering
 # Authors: Jinpeng Wang <Tsinghua University>
 #          Kelong Mao <Tsinghua University>
 # Edited by XUEPAI Team
-#======================================================================
+# ======================================================================
 
 import numpy as np
 import pandas as pd
@@ -34,36 +34,65 @@ class ItemKNN:
         print("%s Reading dataset..." % datetime.now())
         train = pd.read_csv(train_data, sep="\t").values.astype(int)
         test = pd.read_csv(test_data, sep="\t").values.astype(int)
+
+        # train = train[train[:, 0] < 500]
+        # train = train[train[:, 1] < 1000]
+        #
+        # test = test[test[:, 0] < 500]
+        # test = test[test[:, 1] < 1000]
+
         total = np.vstack([train, test])
         self.nUsers = len(np.unique(total[:, 0]))
         self.nItems = len(np.unique(total[:, 1]))
-        print("%s Number of users: %d, number of items: %d" % (datetime.now(),  self.nUsers, self.nItems))
-        self.trainIUMatrix = csc_matrix((np.ones(len(train)), train.T), 
-                                        shape=(self.nUsers, self.nItems)).T # row:item, col:user
+
+        # self.nUsers = 500
+        # self.nItems = 1000
+
+        print("%s Number of users: %d, number of items: %d" % (datetime.now(), self.nUsers, self.nItems))
+        # print(train.T)
+        # print(csc_matrix((np.ones(len(train)), train.T),
+        #                  shape=(self.nUsers, self.nItems)))
+        self.trainIUMatrix = csc_matrix((np.ones(len(train)), train.T),
+                                        shape=(self.nUsers, self.nItems)).T  # row:item, col:user
+        # csc_matrix((data, (row,col)),shape=())
+
         self.test_items = defaultdict(list)
         for row in test:
             self.test_items[row[0]].append(row[1])
 
     def fit(self):
         self.sim_matrix = self.get_pairwise_similarity()
+
         self.sim_matrix[np.isnan(self.sim_matrix)] = -1
         if self.renormalize_similarity:
-            self.sim_matrix = (self.sim_matrix + 1) / 2 # map to 0 ~ 1
-        self.sim_matrix[self.sim_matrix < self.min_similarity_threshold] = 0 # remove similar values less than threshold
-        item_indexes = np.argpartition(-self.sim_matrix, self.num_neighbors)[:, self.num_neighbors:] # pick the smallest
+            self.sim_matrix = (self.sim_matrix + 1) / 2  # map to 0 ~ 1
+        self.sim_matrix[
+            self.sim_matrix < self.min_similarity_threshold] = 0  # remove similar values less than threshold
+        item_indexes = np.argpartition(-self.sim_matrix, self.num_neighbors)[:,
+                       self.num_neighbors:]  # pick the smallest
+        # 选择最相似的num_neighbors个item 其余置为0
+        # np.partition(data, kth)返回的是排序后的data数组，其中前kth个比后kth个小，而np.argpartition返回的是数组的索引
+        # print(np.partition(-self.sim_matrix, self.num_neighbors))
         self.sim_matrix[np.arange(item_indexes.shape[0])[:, np.newaxis], item_indexes] = 0
+        # 采用广播机制的矩阵索引
+
         self.sim_matrix = normalize(self.sim_matrix, norm='l1', axis=1)
         print('%s Finished similarity matrix computation.' % datetime.now())
 
     def predict(self):
         print('%s Start predicting preference...' % datetime.now())
         trainIUMatrix = self.trainIUMatrix.toarray()
+
         if self.enable_average_bias:
             item_mean = np.mean(trainIUMatrix, axis=1, keepdims=True)
+
             pred_matrix = np.dot(self.sim_matrix, trainIUMatrix - item_mean) + item_mean
         else:
             pred_matrix = np.dot(self.sim_matrix, trainIUMatrix)
-        pred_matrix[trainIUMatrix > 0] = -np.inf # remove clicked items in train data
+
+        # pred_matrix.shape 大小为 (item,user)
+        pred_matrix[trainIUMatrix > 0] = -np.inf  # remove clicked items in train data
+        # 转置后大小为(user,item) 表示user对每个item的评分
         return pred_matrix.T
 
     def evaluate(self):
@@ -73,9 +102,9 @@ class ItemKNN:
     def get_pairwise_similarity(self):
         print('%s Start computing similarity matrix...' % datetime.now())
         if self.similarity_measure == 'pearson':
-            return np.corrcoef(self.trainIUMatrix.toarray()) - 2 * np.eye(self.nItems) # set diagnal to -1
+            return np.corrcoef(self.trainIUMatrix.toarray()) - 2 * np.eye(self.nItems)  # set diagnal to -1
         elif self.similarity_measure == 'cosine':
-            return cosine_similarity(self.trainIUMatrix.toarray()) - 2 * np.eye(self.nItems) # set diagnal to -1
+            return cosine_similarity(self.trainIUMatrix.toarray()) - 2 * np.eye(self.nItems)  # set diagnal to -1
         else:
             raise NotImplementedError("similarity_measure=%s is not supported." % self.similarity_measure)
 
@@ -88,7 +117,8 @@ if __name__ == '__main__':
               "min_similarity_threshold": 0,
               "renormalize_similarity": True,
               "enable_average_bias": True,
-              "metrics": ["F1(k=20)", "Recall(k=20)", "Recall(k=50)", "NDCG(k=20)", "NDCG(k=50)", "HitRate(k=20)", "HitRate(k=50)"]}
+              "metrics": ["F1(k=20)", "Recall(k=20)", "Recall(k=50)", "NDCG(k=20)", "NDCG(k=50)", "HitRate(k=20)",
+                          "HitRate(k=50)"]}
     model = ItemKNN(params)
-    model.fit()
+    # model.fit()
     model.evaluate()
